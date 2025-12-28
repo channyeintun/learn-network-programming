@@ -1,98 +1,160 @@
-# Network Roadmap Validation Report
+# Roadmap Validation Report
 
-## ✅ Overall Assessment: Excellent
+## ✅ Cloud-Native Network Programming Roadmap
 
-Your roadmap is **well-structured and comprehensive**. Here's a detailed validation:
-
----
-
-## Strengths
-
-### 1. Progressive Learning Structure
-Your 6-phase approach correctly builds knowledge incrementally:
-- Fundamentals → Go Programming → Raw Sockets → Architecture → Advanced → Production
-
-### 2. Practical Project Focus
-The multi-WAN load balancer is an **excellent choice** because:
-- Real-world applicable (home/office networks)
-- Covers all networking layers
-- Combines backend (Go) + frontend (React) skills
-- Portfolio-worthy project
-
-### 3. Correct Technical Stack
-- ✅ `gopacket` for packet manipulation
-- ✅ `netlink` for Linux network configuration
-- ✅ `go-iptables` for firewall rules
-- ✅ Proper use of iptables MARK + conntrack
+Your new roadmap focuses on building cloud networking tools using **eBPF, XDP, and Kubernetes networking**.
 
 ---
 
-## Gap Analysis: Your Current Knowledge → Roadmap
+## Current Knowledge Assessment
 
-Based on what you shared, here's what you already know vs. what needs more depth:
+Based on what you shared previously:
 
 | Topic | Your Level | Roadmap Requires | Gap |
 |-------|------------|------------------|-----|
 | Number Systems | ✅ Strong | Basic | None |
-| IP Addressing | ✅ Strong | Intermediate | Minor |
-| Subnetting/CIDR | ✅ Strong | Advanced | Medium |
-| OSI Model | ⚠️ Mentioned | Deep Layer 3-4 | **Learn** |
+| IP Addressing | ✅ Strong | Intermediate | None |
+| Subnetting/CIDR | ✅ Strong | Advanced | Minor |
+| OSI Model | ⚠️ Mentioned | Deep L2-L4 | **Learn** |
 | TCP/UDP | ⚠️ Basic | State machines | **Learn** |
-| NAT | ⚠️ Conceptual | SNAT/DNAT/Masq | **Learn** |
-| Routing Tables | ⚠️ Basic | Policy routing | **Learn** |
-| Connection Tracking | ❌ Not covered | Essential | **Critical** |
-| iptables | ❌ Not covered | Mastery needed | **Critical** |
+| NAT | ⚠️ Conceptual | SNAT/DNAT | **Learn** |
+| Linux Namespaces | ❌ Not covered | Essential | **Critical** |
+| eBPF | ❌ Not covered | Core skill | **Critical** |
+| XDP | ❌ Not covered | Essential | **Critical** |
+| Kubernetes | ❓ Unknown | Deep understanding | **Assess** |
 | Go networking | ❓ Unknown | Core skill | **Assess** |
 
 ---
 
-## Recommended Additions to Roadmap
+## What You'll Build
 
-### 1. Add Pre-Phase: "Validate Your Setup"
-Before Phase 1, ensure you have:
-```bash
-# Linux VM or WSL2 with root access
-# Wireshark installed
-# Go 1.21+ installed
-# Network you can experiment with (home router)
-```
+### Milestone Projects
 
-### 2. Add Concept: "The 5-Tuple"
-Critical for connection tracking:
-```
-Source IP + Source Port + Dest IP + Dest Port + Protocol = Unique Connection
-```
+1. **Month 1-2: Foundation**
+   - Packet sniffer with gopacket
+   - HTTP proxy
+   - XDP packet counter
 
-### 3. Add Concept: "Packet Flow Through Linux"
+2. **Month 3-4: eBPF Mastery**
+   - XDP firewall with configurable rules
+   - L4 load balancer
+   - Connection tracker
+
+3. **Month 5-6: Kubernetes Integration**
+   - Simple CNI plugin
+   - eBPF-based network policy enforcer
+
+4. **Month 6-8: Major Project**
+   Choose one:
+   - L4 Load Balancer (like Katran)
+   - Network Observability Tool (like Hubble)
+   - DNS Proxy (like CoreDNS)
+   - Service Mesh Data Plane
+
+---
+
+## Key Technology Stack
+
 ```
-PREROUTING → ROUTING DECISION → FORWARD → POSTROUTING
-                    ↓
-               INPUT → Local Process → OUTPUT
+┌─────────────────────────────────────────────┐
+│            Your Skill Stack                 │
+├─────────────────────────────────────────────┤
+│  Language     │  Go                         │
+│  Core Tech    │  eBPF, XDP                  │
+│  Libraries    │  cilium/ebpf, netlink       │
+│  Platform     │  Linux Kernel, Kubernetes   │
+│  Tools        │  bpftool, bpftrace, tcpdump │
+└─────────────────────────────────────────────┘
 ```
 
 ---
 
-## Timeline Reality Check
+## Learning Path
 
-Your estimate of 4-6 months at 10-15 hrs/week is **realistic** if:
-- You have some Go experience
-- You have Linux access
-- You can stay consistent
+### Phase 1: Linux Networking (2-3 weeks)
+- Network namespaces, veth pairs, bridges
+- Packet flow through kernel
+- tcpdump mastery
 
-**Adjusted timeline based on your current knowledge:**
-- Phase 1: 2-3 weeks (you have foundation) ✅
-- Phase 2: 3 weeks (Go networking is new)
-- Phase 3: 4 weeks (raw sockets are complex)
-- Phase 4-6: As planned
+### Phase 2: Go Network Programming (2-3 weeks)
+- TCP/UDP sockets
+- gopacket for packet parsing
+- netlink for kernel communication
+
+### Phase 3: eBPF Fundamentals (4-5 weeks) ⭐ MOST IMPORTANT
+- eBPF architecture & verifier
+- XDP programs
+- Maps for state management
+- cilium/ebpf library
+
+### Phase 4: XDP Deep Dive (3-4 weeks)
+- Header parsing & rewriting
+- Load balancing algorithms
+- Connection tracking
+
+### Phase 5: Kubernetes Networking (4-5 weeks)
+- CNI plugin development
+- Service networking
+- Network policies with eBPF
+
+### Phase 6: Production Tool (5-6 weeks)
+- Complete one major project
+- Metrics, logging, testing
+- Documentation
 
 ---
 
-## Next Step
+## Teaching Modules
 
-Continue to the teaching modules I'm creating:
-1. `01-osi-model-deep-dive.md`
-2. `02-tcp-udp-mastery.md`
-3. `03-nat-and-routing.md`
-4. `04-connection-tracking.md`
-5. `05-iptables-guide.md`
-6. `06-go-networking.md`
+| Module | File | Status |
+|--------|------|--------|
+| OSI Model Deep Dive | `01-osi-model-deep-dive.md` | ✅ Ready |
+| NAT and Routing | `02-nat-and-routing.md` | ✅ Ready |
+| Connection Tracking | `03-connection-tracking.md` | ✅ Ready |
+| iptables Mastery | `04-iptables-mastery.md` | ✅ Ready (foundation) |
+| Go Networking | `05-go-networking.md` | ✅ Ready |
+| eBPF Fundamentals | `06-ebpf-fundamentals.md` | ✅ NEW |
+| Quick Reference | `07-quick-reference.md` | 🔄 Updating |
+
+---
+
+## Why This Path?
+
+### Career Value
+
+eBPF engineers are in **extremely high demand**:
+
+- Meta, Google, CloudFlare, Netflix use eBPF
+- Kubernetes networking is moving to eBPF (Cilium)
+- Security tools use eBPF (Falco, Tetragon)
+- Observability uses eBPF (Pixie, Grafana Beyla)
+
+**Salary range**: $150K-$300K+ for senior eBPF engineers
+
+### Your Advantage
+
+As a frontend developer who masters eBPF:
+- Build observability dashboards others can't
+- Create developer-friendly CLIs and APIs
+- Full-stack from kernel to UI is rare
+
+---
+
+## Next Steps
+
+1. ✅ Main roadmap updated → `network-roadmap.md`
+2. ✅ eBPF module created → `06-ebpf-fundamentals.md`
+3. Continue with existing foundation modules
+4. When ready for eBPF, start Module 6
+
+---
+
+## Recommended Starting Point
+
+If you're comfortable with the networking basics from previous modules:
+
+**Jump to Module 5 (Go Networking)** → Then **Module 6 (eBPF)**
+
+If you need to reinforce fundamentals:
+
+**Start with Module 1 (OSI Model)** → Progress through all modules

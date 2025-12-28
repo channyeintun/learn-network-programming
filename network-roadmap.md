@@ -1,710 +1,645 @@
-# Network Systems Developer Roadmap - Complete Guide
+# Cloud-Native Network Programming Roadmap
 
-**Target:** Frontend developers (JS/TS/React/Next.js) with Go knowledge wanting to build network systems tools
+**Target:** Frontend developers (JS/TS/React/Next.js) with Go knowledge wanting to build cloud networking tools
 
-**Timeline:** 4-6 months (10-15 hours/week)
+**Timeline:** 6-8 months (10-15 hours/week)
 
-**Goal:** Build production-ready multi-WAN load balancer
+**Goal:** Contribute to or build cloud networking tools like Cilium, Traefik, CoreDNS, or your own
+
+---
+
+## Why Cloud-Native Networking?
+
+Cloud-native networking is the **hottest area** in infrastructure today:
+
+- **eBPF** is revolutionizing Linux networking, security, and observability
+- Companies like Meta, Google, CloudFlare, Netflix use eBPF in production
+- **Kubernetes networking** demands specialized skills
+- **High demand, low supply** of engineers who understand this stack
+- Open source projects (Cilium, Falco, Pixie) are actively seeking contributors
 
 ---
 
 ## PART I: LEARNING ROADMAP
 
-### Phase 1: Network Fundamentals (2-3 weeks)
+### Phase 1: Linux Networking Deep Dive (2-3 weeks)
 
 **Objectives:**
-- OSI model layers 3-4 (IP, TCP/UDP)
-- Routing tables, NAT, packet flow
-- Connection tracking (conntrack)
-- Policy routing
+- Master OSI model layers 2-4 (Ethernet, IP, TCP/UDP)
+- Understand Linux kernel networking stack
+- Master packet flow through Linux
+- Understand namespaces and virtual networking
 
 **Key Concepts:**
+
+```
+Packet Journey Through Linux Kernel:
+                                          
+   NIC → Driver → XDP Hook → tc ingress → netfilter/iptables
+                                               ↓
+                                          Routing Decision
+                                               ↓
+                              ┌────────────────┴────────────────┐
+                              ↓                                 ↓
+                         Local Delivery                    Forward
+                              ↓                                 ↓
+                         Socket Layer                   tc egress → NIC
+                              ↓
+                         Application
+```
+
+**Topics:**
 - IP addressing, subnetting, CIDR
-- TCP: 3-way handshake, state machine, connection tracking
-- UDP: connectionless, use cases
+- TCP: 3-way handshake, state machine, congestion control
+- UDP: connectionless, use cases (DNS, QUIC)
+- ARP, MAC addresses, VLANs
+- Network namespaces, veth pairs, bridges
 - NAT: SNAT, DNAT, masquerading
-- Routing: tables, metrics, default gateway
+- Routing: tables, metrics, policy routing
 
 **Exercises:**
-1. Use Wireshark to capture HTTP traffic, identify TCP handshake
-2. Examine home router routing table
-3. Practice: `ip route show`, `ip addr show`, `conntrack -L`
-4. Trace connections with `traceroute` and `mtr`
+1. Create network namespaces and connect with veth pairs
+2. Build a virtual network with bridges
+3. Trace a packet through iptables with logging
+4. Use `tcpdump` to capture and analyze traffic
+5. Explore `/proc/net/*` and `/sys/class/net/*`
 
-**Resources:**
-- "Computer Networking: A Top-Down Approach" (Chapters 3-4)
-- "TCP/IP Illustrated, Vol 1" by Stevens
-- Wireshark tutorials
-- Linux man pages: `man ip`, `man iptables`
+**Commands to Master:**
+```bash
+# Network namespaces
+ip netns add ns1
+ip netns exec ns1 ip link
+ip link add veth0 type veth peer name veth1
+ip link set veth1 netns ns1
+
+# Packet capture
+tcpdump -i any -nn 'tcp port 80'
+tcpdump -i eth0 -w capture.pcap
+
+# Routing
+ip route show table all
+ip rule list
+cat /proc/net/route
+
+# iptables (foundation before eBPF)
+iptables -t filter -L -v -n
+iptables -t nat -L -v -n
+conntrack -L
+```
 
 ---
 
 ### Phase 2: Go Network Programming (2-3 weeks)
 
 **Objectives:**
-- Master `net` package
+- Master Go's `net` package
 - TCP/UDP socket programming
-- Connection management, timeouts
-- HTTP internals
+- HTTP internals and proxies
+- Understand syscalls for networking
 
 **Projects:**
-1. Port scanner (scan ports 1-1024)
-2. TCP echo server (concurrent connections)
-3. UDP chat app (peer-to-peer)
-4. HTTP proxy (forward + modify headers)
-5. Connection pool implementation
+1. **Port scanner** - Scan ports with goroutine pool
+2. **TCP echo server** - Concurrent connection handling
+3. **HTTP proxy** - Forward requests, modify headers
+4. **DNS client** - Parse DNS wire format
+5. **Packet sniffer** - Using raw sockets
 
-**Code Example - TCP Server:**
+**Key Code Patterns:**
+
 ```go
+// Raw socket for packet capture
+fd, err := syscall.Socket(syscall.AF_PACKET, syscall.SOCK_RAW, int(htons(syscall.ETH_P_ALL)))
+
+// Network namespace switching
+runtime.LockOSThread()
+defer runtime.UnlockOSThread()
+netns.Set(targetNs)
+
+// Efficient connection handling
 listener, _ := net.Listen("tcp", ":8080")
 for {
     conn, _ := listener.Accept()
-    go handleConnection(conn)
+    go handle(conn)
 }
 ```
 
 **Key Packages:**
-- `net` - networking
-- `net/http` - HTTP
-- `context` - cancellation/timeouts
-- `io` - I/O operations
+- `net` - TCP/UDP sockets
+- `net/http` - HTTP client/server
+- `syscall` / `golang.org/x/sys/unix` - Low-level syscalls
+- `github.com/google/gopacket` - Packet parsing
+- `github.com/vishvananda/netlink` - Netlink API
+- `github.com/vishvananda/netns` - Network namespaces
 
 ---
 
-### Phase 3: Raw Sockets & Packet Manipulation (3-4 weeks)
+### Phase 3: eBPF Fundamentals (4-5 weeks)
+
+**This is the core skill that makes cloud-native networking possible.**
 
 **Objectives:**
-- Raw socket programming
-- Parse/construct packets
-- iptables mastery
-- Multi-table routing
+- Understand eBPF architecture and verifier
+- Write eBPF programs in C
+- Use cilium/ebpf or libbpf-go from Go
+- Master eBPF maps for data sharing
+- Attach to various hook points
+
+**What is eBPF?**
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                         User Space                               │
+│  ┌─────────────┐    ┌─────────────┐    ┌─────────────────────┐ │
+│  │  Your Go    │───→│ eBPF Loader │───→│  eBPF Maps          │ │
+│  │  Program    │←───│ (cilium/ebpf)│←───│  (shared data)      │ │
+│  └─────────────┘    └──────┬──────┘    └─────────────────────┘ │
+│                            │                     ↑               │
+├────────────────────────────┼─────────────────────┼───────────────┤
+│                         Kernel                   │               │
+│                            ↓                     │               │
+│  ┌──────────────────────────────────────────────┴─────────────┐ │
+│  │                    eBPF Virtual Machine                     │ │
+│  │  ┌─────────┐  ┌─────────┐  ┌─────────┐  ┌─────────────┐   │ │
+│  │  │ XDP     │  │ TC      │  │ Socket  │  │ Tracepoints │   │ │
+│  │  │ (L2)    │  │ (L3)    │  │ Filters │  │ & kprobes   │   │ │
+│  │  └─────────┘  └─────────┘  └─────────┘  └─────────────┘   │ │
+│  └─────────────────────────────────────────────────────────────┘ │
+│                                                                   │
+│  Network Stack ←──────── Hook Points ──────────→ Tracing         │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+**eBPF Hook Points for Networking:**
+
+| Hook | Layer | Use Case | Performance |
+|------|-------|----------|-------------|
+| XDP | L2/Driver | Packet filtering, DDoS mitigation | Fastest |
+| TC (ingress/egress) | L3 | Traffic shaping, load balancing | Fast |
+| Socket filters | L4 | Per-socket filtering | Medium |
+| cgroup/sock | Socket | Container networking | Medium |
+| kprobes | Any | Debugging, tracing | Flexible |
+
+**eBPF Maps (Key-Value Stores):**
+
+```c
+// Define a map in eBPF C
+struct {
+    __uint(type, BPF_MAP_TYPE_HASH);
+    __uint(max_entries, 10000);
+    __type(key, __u32);   // IP address
+    __type(value, __u64); // packet count
+} packet_count SEC(".maps");
+```
 
 **Projects:**
-1. Packet sniffer (display src/dst IPs, ports)
-2. TCP proxy with packet modification
-3. Basic NAT implementation
-4. Rule-based packet router
+1. **Packet counter** - Count packets per IP with XDP
+2. **Simple firewall** - Drop packets by IP/port
+3. **Connection tracker** - Track TCP connections
+4. **Latency tracer** - Measure packet latency with kprobes
 
-**Linux Commands to Master:**
-```bash
-# Routing
-ip route show table all
-ip route add default via 192.168.1.1 table 100
-ip rule add fwmark 1 table 100
+**Tools:**
+- `bpftool` - Inspect loaded eBPF programs
+- `bpftrace` - High-level eBPF tracing
+- `libbpf` / `cilium/ebpf` - Libraries for loading eBPF
 
-# iptables
-iptables -t mangle -L -v -n
-iptables -t mangle -A PREROUTING -s 10.0.0.50 -j MARK --set-mark 1
-iptables -t nat -A POSTROUTING -o eth0 -j MASQUERADE
-
-# Connection tracking
-conntrack -L
-conntrack -L -p tcp
-```
-
-**Go Packages:**
-- `github.com/google/gopacket` - packet manipulation
-- `golang.org/x/net/ipv4` - IPv4 operations
-- `github.com/vishvananda/netlink` - netlink API
-- `github.com/coreos/go-iptables` - iptables control
+**Resources:**
+- "Learning eBPF" by Liz Rice (O'Reilly)
+- https://ebpf.io - Official eBPF site
+- https://docs.cilium.io/en/latest/bpf/
+- https://github.com/cilium/ebpf (Go library)
 
 ---
 
-### Phase 4: Multi-WAN Architecture (4-5 weeks)
+### Phase 4: XDP & High-Performance Packet Processing (3-4 weeks)
 
-**Load Balancing Strategies:**
+**Objectives:**
+- Master XDP (eXpress Data Path)
+- Process millions of packets per second
+- Build load balancers and firewalls
+- Understand AF_XDP for user-space processing
 
-1. **Failover** - Primary + backup (simplest)
-2. **Round-robin** - Alternate between ISPs
-3. **Weighted** - Distribute by bandwidth ratio (70/30)
-4. **Least connections** - Route to ISP with fewer connections
-5. **Latency-based** - Choose ISP with lower RTT
-6. **Application-aware** - Route by domain/port/protocol
+**XDP Actions:**
 
-**Critical: Per-Connection Persistence**
-- Once assigned, connection MUST stay on same ISP
-- Prevents breaking TCP, SSL, auth sessions
+```c
+// XDP program return values
+XDP_DROP    // Drop packet (DDoS defense)
+XDP_PASS    // Pass to normal network stack
+XDP_TX      // Bounce packet back out same interface
+XDP_REDIRECT // Send to another interface or CPU
+XDP_ABORTED // Error, drop with trace
+```
 
-**Implementation Versions:**
+**XDP Modes:**
 
-**V1: Basic Failover (Week 1-2)**
-- Health monitoring (ping ISPs every 5s)
-- Detect failure (3 consecutive fails)
-- Switch default route
-- Restore when recovered
+| Mode | Description | Performance |
+|------|-------------|-------------|
+| Native | Driver support required | Best (40M+ pps) |
+| Generic | Works everywhere | Good (1M+ pps) |
+| Offloaded | Runs on NIC hardware | Fastest |
 
-**V2: Connection Tracking (Week 2-3)**
-- Track connections in memory
-- Assign ISP on first packet
-- Persist throughout lifetime
-- Use iptables MARK + conntrack
+**Project: XDP Load Balancer**
 
-**V3: Weighted Distribution (Week 3-4)**
-- Configure weight ratios (e.g., 0.7, 0.3)
-- Count connections per ISP
-- Route to ISP with lowest (connections/weight)
+```
+                    ┌─────────────────────┐
+                    │   XDP Load Balancer │
+   Clients ────────→│                     │────────→ Backend 1
+                    │  - Hash by 5-tuple  │────────→ Backend 2
+                    │  - IPIP/GUE encap   │────────→ Backend 3
+                    │  - Connection track │
+                    └─────────────────────┘
+```
 
-**V4: Application-Aware (Week 4-5)**
-- Policy configuration (YAML)
-- Match by domain, port, source IP
-- Priority system for conflicts
-- DNS integration
+**Implementation approach:**
+1. Parse Ethernet, IP, TCP/UDP headers in XDP
+2. Hash connection 5-tuple
+3. Select backend from BPF map
+4. Rewrite packet headers (DSR or NAT)
+5. Track connection state in BPF map
+
+**Sample XDP Code:**
+
+```c
+SEC("xdp")
+int xdp_lb(struct xdp_md *ctx) {
+    void *data = (void *)(long)ctx->data;
+    void *data_end = (void *)(long)ctx->data_end;
+    
+    struct ethhdr *eth = data;
+    if ((void *)(eth + 1) > data_end)
+        return XDP_PASS;
+    
+    if (eth->h_proto != htons(ETH_P_IP))
+        return XDP_PASS;
+    
+    struct iphdr *ip = (void *)(eth + 1);
+    if ((void *)(ip + 1) > data_end)
+        return XDP_PASS;
+    
+    // Look up backend in BPF map
+    __u32 key = ip->daddr;
+    struct backend *backend = bpf_map_lookup_elem(&backends, &key);
+    if (!backend)
+        return XDP_PASS;
+    
+    // Rewrite destination IP
+    ip->daddr = backend->ip;
+    ip->check = 0;
+    ip->check = checksum((void *)ip, sizeof(*ip));
+    
+    return XDP_TX;  // Send back out
+}
+```
 
 ---
 
-### Phase 5: Advanced Features (3-4 weeks)
+### Phase 5: Kubernetes Networking & CNI (4-5 weeks)
 
-**Features:**
-1. **Connection Persistence** - Track in memory + disk
-2. **Intelligent Routing** - Measure RTT, choose best path
-3. **Bandwidth Monitoring** - Track usage per ISP, quotas
-4. **Quality Metrics** - Packet loss, jitter, latency
-5. **DNS-aware** - Route based on resolved domain
+**Objectives:**
+- Understand Kubernetes networking model
+- Build a CNI plugin from scratch
+- Understand how Cilium/Calico work
+- Master Network Policies
 
-**Optimizations:**
-- Minimize routing table lookups
-- Efficient connection state management
-- Lock-free data structures
-- Goroutine pooling for health checks
-
----
-
-### Phase 6: Production & UI (3-4 weeks)
-
-**Management Interface:**
-- REST API (status, config, control)
-- React dashboard (real-time WebSocket updates)
-- CLI tool (command-line management)
-- YAML configuration files
-
-**Observability:**
-- Structured logging (zerolog/zap)
-- Prometheus metrics export
-- Health check endpoints
-- Historical data storage
-
-**Deployment:**
-- Systemd service
-- Docker container
-- Installation script
-- Backup/restore functionality
-
----
-
-## PART II: TECHNICAL ARCHITECTURE
-
-### System Topology
+**Kubernetes Networking Model:**
 
 ```
-Internet ISP1 (192.168.1.1) ──┐
-                               ├─→ [Linux Gateway] ──→ Home Network (10.0.0.0/24)
-Internet ISP2 (192.168.2.1) ──┘    (Go Load Balancer)
+┌─────────────────────────────────────────────────────────────────┐
+│                         Kubernetes Node                         │
+│                                                                  │
+│  ┌──────────────────┐         ┌──────────────────┐             │
+│  │ Pod A (10.0.1.5) │         │ Pod B (10.0.1.6) │             │
+│  │ ┌──────────────┐ │         │ ┌──────────────┐ │             │
+│  │ │ Container    │ │         │ │ Container    │ │             │
+│  │ │   eth0       │ │         │ │   eth0       │ │             │
+│  │ └──────┬───────┘ │         │ └──────┬───────┘ │             │
+│  │        │ veth    │         │        │ veth    │             │
+│  └────────┼─────────┘         └────────┼─────────┘             │
+│           │                            │                        │
+│           └──────────┬─────────────────┘                        │
+│                      │                                          │
+│              ┌───────▼───────┐                                  │
+│              │  CNI Plugin   │  (Cilium, Calico, Flannel)      │
+│              │  - IP assign  │                                  │
+│              │  - Routing    │                                  │
+│              │  - Policy     │                                  │
+│              └───────┬───────┘                                  │
+│                      │                                          │
+│              ┌───────▼───────┐                                  │
+│              │ Node Network  │                                  │
+│              │  (eBPF/iptables)                                │
+│              └───────────────┘                                  │
+└─────────────────────────────────────────────────────────────────┘
 ```
 
-### Hardware Requirements
+**CNI Plugin Development:**
 
-**Minimum:**
-- Dual-core 1GHz CPU
-- 512MB RAM
-- 3× Ethernet ports
-- 4GB storage
+A CNI plugin is just an executable that handles:
+- `ADD` - Set up networking for a container
+- `DEL` - Clean up networking
+- `CHECK` - Verify networking is correct
 
-**Recommended:**
-- Quad-core 1.5GHz+ CPU
-- 1GB+ RAM
-- 3× Gigabit Ethernet
-- 16GB+ storage
-- Raspberry Pi 4 (4GB) perfect for home use (~$100)
-
-### Core Components
-
-1. **Health Monitor** - Ping ISPs, measure latency/loss
-2. **Connection Tracker** - Maintain connection-to-ISP mapping
-3. **Routing Engine** - Make routing decisions
-4. **Route Manager** - Update iptables + routing tables
-5. **Policy Manager** - Apply user-defined rules
-6. **Metrics Collector** - Bandwidth, latency, connections
-7. **API Server** - REST API for management
-8. **Web Dashboard** - React UI
-
----
-
-## PART III: IMPLEMENTATION GUIDE
-
-### Project Structure
-
-```
-multiwan-loadbalancer/
-├── cmd/
-│   ├── daemon/          # Main daemon
-│   └── cli/             # CLI tool
-├── internal/
-│   ├── health/          # Health monitoring
-│   ├── conntrack/       # Connection tracking
-│   ├── routing/         # Routing engine
-│   ├── policy/          # Policy management
-│   └── netlink/         # Linux netlink interface
-├── pkg/
-│   ├── config/          # Configuration
-│   └── api/             # REST API
-├── web/                 # React dashboard
-├── configs/
-│   └── config.yaml      # Configuration
-└── scripts/
-    └── install.sh       # Installation
-```
-
-### Health Monitor Implementation
+**Simple CNI Plugin Structure:**
 
 ```go
-package health
-
-type Monitor struct {
-    isps    []ISP
-    states  map[string]*ISPHealth
-    updates chan HealthUpdate
-}
-
-type ISPHealth struct {
-    IsUp          bool
-    PacketLoss    float64
-    AvgLatency    time.Duration
-    LastCheck     time.Time
-}
-
-func (m *Monitor) monitorISP(ctx context.Context, isp ISP) {
-    ticker := time.NewTicker(5 * time.Second)
-    for {
-        select {
-        case <-ticker.C:
-            health := m.checkHealth(isp)
-            m.updateState(isp.Name, health)
-        case <-ctx.Done():
-            return
-        }
-    }
-}
-
-func (m *Monitor) checkHealth(isp ISP) *ISPHealth {
-    var totalLatency time.Duration
-    var successCount int
+// main.go
+func cmdAdd(args *skel.CmdArgs) error {
+    // 1. Parse config
+    conf, _ := parseConfig(args.StdinData)
     
-    for _, target := range isp.Targets {
-        start := time.Now()
-        err := m.ping(target, isp.Interface)
-        latency := time.Since(start)
-        
-        if err == nil {
-            successCount++
-            totalLatency += latency
-        }
+    // 2. Create veth pair
+    hostVeth, containerVeth, _ := ip.SetupVeth(args.IfName, 1500, "", args.Netns)
+    
+    // 3. Assign IP address
+    ipConfig := &current.IPConfig{
+        Address: *ipAddr,
+        Gateway: gateway,
     }
     
-    packetLoss := float64(len(isp.Targets)-successCount) / 
-                  float64(len(isp.Targets)) * 100
+    // 4. Set up routes
+    netns.Do(func(_ ns.NetNS) error {
+        return ip.AddRoute(defaultRoute, gateway, containerVeth)
+    })
     
-    return &ISPHealth{
-        IsUp:       successCount > 0,
-        PacketLoss: packetLoss,
-        AvgLatency: totalLatency / time.Duration(successCount),
-        LastCheck:  time.Now(),
-    }
+    return types.PrintResult(result, conf.CNIVersion)
 }
 ```
 
-### Routing Engine Implementation
+**Projects:**
+1. **Simple CNI plugin** - Assign IPs, create veth pairs
+2. **eBPF-based CNI** - Use eBPF for routing instead of iptables
+3. **Network Policy enforcer** - Implement K8s NetworkPolicy with eBPF
 
-```go
-package routing
+**Key Concepts:**
+- Pod networking (every pod gets an IP)
+- Service networking (ClusterIP, NodePort, LoadBalancer)
+- kube-proxy modes (iptables, IPVS, eBPF)
+- Ingress controllers
+- Network Policies
 
-type Engine struct {
-    cfg         *config.Config
-    connections *ConnectionTable
-}
+---
 
-func (e *Engine) RouteConnection(conn Connection) RoutingDecision {
-    // Check policy first
-    if policy := e.cfg.Policies.Match(conn); policy != nil {
-        return RoutingDecision{
-            Connection: conn,
-            ISP:        policy.RouteVia,
-            Reason:     "Policy: " + policy.Name,
-        }
-    }
-    
-    // Use algorithm
-    switch e.cfg.Algorithm {
-    case "weighted":
-        return e.weightedRouting(conn)
-    case "least-connections":
-        return e.leastConnectionsRouting(conn)
-    default:
-        return e.roundRobinRouting(conn)
-    }
-}
+### Phase 6: Building Real Tools (5-6 weeks)
 
-func (e *Engine) weightedRouting(conn Connection) RoutingDecision {
-    weights := e.cfg.ISPWeights
-    connCounts := e.connections.CountPerISP()
-    
-    var selectedISP string
-    minRatio := float64(99999)
-    
-    for isp, weight := range weights {
-        ratio := float64(connCounts[isp]) / weight
-        if ratio < minRatio {
-            minRatio = ratio
-            selectedISP = isp
-        }
-    }
-    
-    return RoutingDecision{
-        Connection: conn,
-        ISP:        selectedISP,
-        Reason:     "Weighted distribution",
-    }
-}
+**Choose one or more projects:**
+
+#### Option A: L4 Load Balancer (like Cilium's)
+
+```
+Features:
+- XDP-based packet processing
+- Maglev consistent hashing
+- DSR (Direct Server Return)
+- Health checking
+- Connection tracking
+- Graceful backend addition/removal
 ```
 
-### Linux Network Setup
+#### Option B: Network Observability Tool (like Pixie/Hubble)
 
-```bash
-# Enable IP forwarding
-echo 1 > /proc/sys/net/ipv4/ip_forward
-
-# Setup routing tables
-# /etc/iproute2/rt_tables
-100 isp1_table
-200 isp2_table
-
-# Configure ISP1 table
-ip route add default via 192.168.1.1 dev eth0 table isp1_table
-ip route add 192.168.1.0/24 dev eth0 table isp1_table
-
-# Configure ISP2 table
-ip route add default via 192.168.2.1 dev eth1 table isp2_table
-ip route add 192.168.2.0/24 dev eth1 table isp2_table
-
-# Policy routing rules
-ip rule add fwmark 1 table isp1_table priority 100
-ip rule add fwmark 2 table isp2_table priority 100
-
-# NAT masquerading
-iptables -t nat -A POSTROUTING -o eth0 -j MASQUERADE
-iptables -t nat -A POSTROUTING -o eth1 -j MASQUERADE
-
-# Connection tracking
-iptables -t mangle -A PREROUTING -m conntrack --ctstate NEW \
-    -m statistic --mode random --probability 0.7 \
-    -j MARK --set-mark 1
-
-iptables -t mangle -A PREROUTING -j CONNMARK --save-mark
-
-iptables -t mangle -A PREROUTING \
-    -m conntrack --ctstate ESTABLISHED,RELATED \
-    -j CONNMARK --restore-mark
+```
+Features:
+- eBPF-based packet capture
+- Protocol parsing (HTTP, gRPC, DNS)
+- Latency histograms
+- Connection flow visualization
+- Kubernetes-aware (pod/service names)
 ```
 
-### Configuration File (config.yaml)
+#### Option C: DNS Proxy/Server (like CoreDNS)
 
-```yaml
-isps:
-  - name: isp1
-    interface: eth0
-    gateway: 192.168.1.1
-    weight: 0.7
-    health_check:
-      targets: [8.8.8.8, 1.1.1.1]
-      interval: 5s
-      timeout: 2s
-      
-  - name: isp2
-    interface: eth1
-    gateway: 192.168.2.1
-    weight: 0.3
-    health_check:
-      targets: [8.8.8.8, 1.1.1.1]
-      interval: 5s
-      timeout: 2s
+```
+Features:
+- DNS protocol implementation
+- Plugin architecture
+- Kubernetes integration
+- Caching
+- Load balancing
+- Metrics export
+```
 
-lan:
-  interface: eth2
-  network: 10.0.0.0/24
+#### Option D: Service Mesh Data Plane (like Envoy, but simpler)
 
-routing:
-  algorithm: weighted
-  failover_enabled: true
-  failover_threshold: 50
-
-policies:
-  - name: Gaming Traffic
-    priority: 100
-    match:
-      source_ips: [10.0.0.25]
-      dest_ports: [3074, 27015]
-    route_via: isp1
-    
-  - name: Video Streaming
-    priority: 90
-    match:
-      domains: [netflix.com, youtube.com]
-    route_via: isp2
-
-api:
-  enabled: true
-  port: 8080
-
-metrics:
-  enabled: true
-  prometheus_port: 9090
+```
+Features:  
+- L7 proxy with eBPF acceleration
+- mTLS termination
+- Traffic routing
+- Circuit breaking
+- Rate limiting
 ```
 
 ---
 
-## PART IV: MILESTONE PROJECTS
-
-### Month 1: Foundation & Simple Failover
-
-**Goal:** Health monitoring with automatic failover
-
-**Deliverables:**
-- Ping both ISPs every 5 seconds
-- Detect failure (3 consecutive fails)
-- Switch default route to secondary
-- Restore primary when recovered
-- Log all state changes
-
-**Testing:**
-- Disconnect primary ISP, verify failover
-- Reconnect, verify restoration
-
----
-
-### Month 2: Connection Tracking
-
-**Goal:** Per-connection ISP assignment
-
-**Deliverables:**
-- Connection tracking table in memory
-- Detect new connections via netfilter
-- Assign and persist ISP per connection
-- Prevent mid-connection switches
-- Connection timeout and cleanup
-
-**Testing:**
-- Long download stays on same ISP
-- Multiple connections distributed
-- Test TCP, UDP, ICMP
-
----
-
-### Month 3: Weighted Load Balancing
-
-**Goal:** Distribute by bandwidth ratio
-
-**Deliverables:**
-- Weighted round-robin algorithm
-- Configurable weights (70/30)
-- Real-time connection counting
-- Dynamic adjustment on failure
-- Metrics dashboard
-
-**Testing:**
-- 100 connections = ~70/30 split
-- Measure actual bandwidth per ISP
-- Verify adjustment when ISP fails
-
----
-
-### Month 4: Application-Aware Routing
-
-**Goal:** Route by app/domain/port
-
-**Deliverables:**
-- YAML policy configuration
-- Domain-based routing (DNS)
-- Port-based rules
-- Source IP routing
-- Priority system
-
-**Testing:**
-- Netflix → ISP2 (verify with Wireshark)
-- Gaming → ISP1 (measure latency)
-- Test policy priorities
-
----
-
-### Month 5: Web Dashboard
-
-**Goal:** React management interface
-
-**Deliverables:**
-- REST API (status, config, control)
-- React dashboard (WebSocket real-time)
-- Bandwidth/latency graphs
-- Connection distribution chart
-- Policy editor UI
-- System logs viewer
-
-**Features:**
-- ISP status cards (up/down, latency, loss)
-- Active connections table
-- Historical bandwidth graphs
-- Live policy editor
-
----
-
-### Month 6: Production Ready
-
-**Goal:** Deploy and optimize
-
-**Deliverables:**
-- Systemd service
-- Graceful shutdown
-- SQLite metrics storage
-- Installation script
-- Docker container
-- Documentation
-
-**Advanced Features:**
-- Bandwidth quotas per ISP
-- Time-based policies
-- Email/Slack notifications
-- Backup/restore config
-- Performance optimization
-
----
-
-## PART V: RESOURCES
+## PART II: TECHNOLOGY DEEP DIVES
 
 ### Essential Go Packages
 
 ```bash
+# eBPF
+go get github.com/cilium/ebpf
+
+# Networking
 go get github.com/vishvananda/netlink
+go get github.com/vishvananda/netns  
 go get github.com/google/gopacket
-go get github.com/coreos/go-iptables
-go get golang.org/x/net/ipv4
-go get github.com/gorilla/mux
-go get github.com/gorilla/websocket
-go get gopkg.in/yaml.v3
-go get github.com/rs/zerolog
+
+# Kubernetes
+go get k8s.io/client-go
+go get github.com/containernetworking/cni
+
+# Observability
 go get github.com/prometheus/client_golang
+
+# Utilities
+go get github.com/rs/zerolog
+go get github.com/spf13/cobra
 ```
 
-### Books
+### eBPF Development Setup
 
-- "TCP/IP Illustrated, Volume 1" - W. Richard Stevens
-- "The Linux Programming Interface" - Michael Kerrisk
-- "Computer Networks" - Andrew Tanenbaum
-- "Network Programming with Go" - Jan Newmarch
+```bash
+# Install dependencies (Ubuntu/Debian)
+sudo apt install -y clang llvm libelf-dev libbpf-dev \
+    linux-headers-$(uname -r) bpftool
 
-### Online Resources
+# Install bpf2go (generates Go from eBPF C)
+go install github.com/cilium/ebpf/cmd/bpf2go@latest
 
-- Linux Advanced Routing: https://lartc.org
-- Netfilter documentation: https://netfilter.org
-- Go networking: https://blog.golang.org
-- iptables tutorial: netfilter.org/documentation
+# Project structure
+myproject/
+├── bpf/
+│   └── program.c          # eBPF C code
+├── main.go                 # Go loader
+├── program_bpfel.go        # Generated (little endian)
+├── program_bpfeb.go        # Generated (big endian)
+└── go.mod
 
-### Tools to Master
+# Generate Go bindings
+//go:generate go run github.com/cilium/ebpf/cmd/bpf2go -cc clang program ./bpf/program.c
+```
 
-- Wireshark - Packet analysis
-- tcpdump - Command-line capture
-- iperf3 - Bandwidth testing
-- mtr - Network diagnostics
-- conntrack - Connection inspection
+### Kernel Version Requirements
 
-### Similar Projects to Study
-
-- mwan3 (OpenWrt) - Multi-WAN package
-- pfSense - Open source firewall
-- Traefik - Cloud-native proxy
-- Cilium - eBPF networking
+| Feature | Minimum Kernel | Recommended |
+|---------|---------------|-------------|
+| Basic eBPF | 4.4 | 5.4+ |
+| XDP | 4.8 | 5.4+ |
+| BTF (CO-RE) | 5.2 | 5.8+ |
+| Ring buffer | 5.8 | 5.8+ |
+| bpf_loop | 5.17 | 5.17+ |
 
 ---
 
-## PART VI: TROUBLESHOOTING
+## PART III: PROJECTS BREAKDOWN
 
-### Common Issues
+### Month 1-2: Foundation
 
-| Issue | Cause | Solution |
-|-------|-------|----------|
-| No internet | IP forwarding disabled | `echo 1 > /proc/sys/net/ipv4/ip_forward` |
-| Not distributed | iptables marks missing | `iptables -t mangle -L -v` |
-| Connections break | ISP switching | Check conntrack MARK persistence |
-| High latency | Wrong gateway | Verify gateway IPs |
-| Policies fail | Priority issues | `ip rule list` |
+**Week 1-2: Linux Networking**
+- Set up lab environment (VMs with multiple interfaces)
+- Create network namespaces, veth pairs, bridges
+- Master tcpdump, iptables, routing
 
-### Debug Commands
+**Week 3-4: Go Networking**
+- Build TCP/UDP servers
+- Implement packet sniffer with gopacket
+- Build simple HTTP proxy
 
-```bash
-# Check routing
-ip route show table all
+**Week 5-6: eBPF Hello World**
+- Set up eBPF development environment
+- Write first XDP program (packet counter)
+- Use bpftool to inspect programs
 
-# Inspect iptables
-iptables -t mangle -L -v -n
-iptables -t nat -L -v -n
+**Week 7-8: eBPF Maps**
+- Implement hash maps, arrays
+- Share data between kernel and user space
+- Build simple firewall
 
-# View connections
-conntrack -L | grep ASSURED
+### Month 3-4: Intermediate
 
-# Monitor packets
-tcpdump -i any -nn 'not port 22'
+**Week 9-10: XDP Deep Dive**
+- Parse Ethernet, IP, TCP headers
+- Implement packet rewriting
+- Build L3/L4 load balancer
 
-# Test routing
-ip route get 8.8.8.8
-traceroute -n 8.8.8.8
-```
+**Week 11-12: Connection Tracking**
+- Implement connection state machine
+- Track 5-tuple connections
+- Handle NAT
+
+**Week 13-14: Kubernetes Basics**
+- Set up local Kubernetes cluster
+- Understand pod networking
+- Trace packets through kube-proxy
+
+**Week 15-16: CNI Development**
+- Write simple CNI plugin
+- Integrate with Kubernetes
+- Test with pods
+
+### Month 5-6: Advanced
+
+**Week 17-20: Main Project**
+- Choose from Phase 6 projects
+- Design architecture
+- Implement core features
+
+**Week 21-24: Polish & Production**
+- Add metrics and logging
+- Write tests
+- Documentation
+- Performance optimization
+
+---
+
+## PART IV: RESOURCES
+
+### Books
+- "Learning eBPF" - Liz Rice (ESSENTIAL)
+- "Linux Observability with BPF" - David Calavera
+- "BPF Performance Tools" - Brendan Gregg
+- "Kubernetes Networking" - James Strong & Vallery Lancey
+- "Network Programming with Go" - Adam Woodbeck
+
+### Online Resources
+- https://ebpf.io - Official eBPF site
+- https://docs.cilium.io - Cilium documentation
+- https://github.com/xdp-project/xdp-tutorial - XDP tutorial
+- https://nakryiko.com/posts/ - Andrii Nakryiko's blog (eBPF maintainer)
+- https://www.brendangregg.com/ebpf.html - Brendan Gregg's eBPF page
+
+### Projects to Study
+- **Cilium** - eBPF-based Kubernetes networking
+- **Katran** - Facebook's L4 load balancer
+- **Calico** - Kubernetes networking with eBPF mode
+- **Falco** - eBPF-based security
+- **Pixie** - eBPF-based observability
+- **CoreDNS** - DNS server in Go
+- **Traefik** - Cloud-native proxy
+
+### Communities
+- eBPF Slack: https://ebpf.io/slack
+- Cilium Slack: https://cilium.io/slack
+- CNCF Slack: https://slack.cncf.io
+- r/kubernetes, r/golang
+
+---
+
+## PART V: CAREER PATH
+
+After completing this roadmap, you'll be qualified for:
+
+- **Cloud Network Engineer** at hyperscalers (Google, Meta, AWS)
+- **Kubernetes Networking Specialist**
+- **eBPF Engineer** (very high demand)
+- **Open Source Contributor** (Cilium, Calico, Falco)
+- **SRE/Platform Engineer** with networking focus
+- **Security Engineer** (eBPF-based security tools)
+
+**Salary Range:** $150K-$300K+ for senior eBPF engineers
+
+### Further Learning
+- DPDK for user-space networking
+- P4 programming
+- SmartNIC programming
+- Kernel development
+- Network security (DDoS mitigation)
 
 ---
 
 ## TIMELINE SUMMARY
 
-**Total: 4-6 months** (10-15 hours/week)
+**Total: 6-8 months** (10-15 hours/week)
 
-- **Month 1:** Network fundamentals + Go basics
-- **Month 2:** Raw sockets + packet manipulation
-- **Month 3:** Core load balancer (failover + tracking)
-- **Month 4:** Weighted distribution + policies
-- **Month 5:** Web dashboard + API
-- **Month 6:** Production features + optimization
+| Month | Focus | Deliverable |
+|-------|-------|-------------|
+| 1 | Linux networking + Go | Packet sniffer, HTTP proxy |
+| 2 | eBPF fundamentals | XDP packet counter, firewall |
+| 3 | XDP deep dive | L4 load balancer |
+| 4 | Kubernetes networking | Simple CNI plugin |
+| 5 | Main project | Core implementation |
+| 6 | Production ready | Complete project |
+
+---
+
+## YOUR ADVANTAGES
+
+As a frontend developer with Go knowledge:
+
+1. **Full-stack observability tools** - Build dashboards for your eBPF tools
+2. **Developer experience** - Make CLI and APIs that developers love
+3. **Documentation** - Clear docs are rare in this space
+4. **Visualization** - Network topology, flow diagrams
+
+This combination of **low-level kernel programming + user-friendly interfaces** is extremely rare and valuable!
 
 ---
 
 ## NEXT STEPS
 
-1. Start Phase 1 this week
-2. Install Wireshark and capture traffic
-3. Set up Linux VM for experiments
-4. Join Go and networking communities
-5. Build incrementally, test frequently
+1. **This week:** Set up Linux VM, create network namespaces
+2. **Install:** bpftool, clang, llvm, Go 1.21+
+3. **Read:** First 2 chapters of "Learning eBPF"
+4. **Code:** Write your first XDP program
+5. **Join:** eBPF Slack community
 
-**Your Advantage:** Frontend expertise means you can build:
-- Polished web dashboard
-- Excellent API design
-- User-friendly CLI
-- Complete full-stack solution
-
-This combination of low-level networking + frontend polish is rare and valuable!
-
----
-
-## CAREER OPPORTUNITIES
-
-After completing this project:
-
-- Network Infrastructure Engineer
-- DevOps/SRE Engineer (network automation)
-- Systems Programmer (networking)
-- Open Source Contributor
-- Freelance/Consulting (deploy for clients)
-
-**Further Learning:**
-- eBPF programming
-- Service mesh (Istio, Linkerd)
-- SDN (Software Defined Networking)
-- High-performance networking (DPDK, XDP)
-- Network security (firewalls, IDS/IPS)
-
----
-
-**Good luck on your journey from frontend developer to network systems engineer!**
+**Good luck on your journey to becoming a cloud-native network engineer!** 🚀
