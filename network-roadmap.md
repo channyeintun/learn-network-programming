@@ -376,7 +376,7 @@ func cmdAdd(args *skel.CmdArgs) error {
 - Pod networking (every pod gets an IP)
 - Service networking (ClusterIP, NodePort, LoadBalancer)
 - kube-proxy modes (iptables, IPVS, eBPF)
-- Ingress controllers
+- Gateway API (modern) / Ingress (legacy)
 - Network Policies
 
 ---
