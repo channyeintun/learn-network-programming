@@ -125,6 +125,38 @@ This is why Kubernetes networking uses eBPF (Cilium)—containers are too fast a
 
 ## PART I: LEARNING ROADMAP
 
+### Two Tracks, One Journey
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│                        CORE NETWORKING (Phases 1-4)                     │
+│  Foundation skills that work anywhere—Linux, bare metal, VMs, or cloud  │
+├─────────────────────────────────────────────────────────────────────────┤
+│  Phase 1          Phase 2          Phase 3          Phase 4             │
+│  Linux Net    →   Go Sockets   →   eBPF         →   XDP                 │
+│  (2-3 weeks)      (2-3 weeks)      (4-5 weeks)      (3-4 weeks)         │
+└─────────────────────────────────────────────────────────────────────────┘
+                                    │
+                                    ▼
+┌─────────────────────────────────────────────────────────────────────────┐
+│                    CLOUD-NATIVE EXTENSION (Phases 5-6)                  │
+│         Apply your skills to Kubernetes and production systems          │
+├─────────────────────────────────────────────────────────────────────────┤
+│  Phase 5                              Phase 6                           │
+│  Kubernetes & CNI                 →   Real Projects                     │
+│  (4-5 weeks)                          (5-6 weeks)                       │
+└─────────────────────────────────────────────────────────────────────────┘
+```
+
+| Track | Phases | What You'll Build | Standalone Value? |
+|-------|--------|-------------------|-------------------|
+| **Core** | 1-4 | Load balancers, firewalls, packet tools | ✅ Yes—valuable without K8s |
+| **Cloud-Native** | 5-6 | CNI plugins, observability, Cilium | Extends Core to K8s |
+
+> **Your goal:** Complete both tracks to become a **cloud-native network programmer**.
+
+---
+
 ### Phase 1: Linux Networking Deep Dive (2-3 weeks)
 
 **Objectives:**
