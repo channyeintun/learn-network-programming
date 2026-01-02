@@ -20,6 +20,8 @@ Build production-ready cloud networking tools like **Cilium**, **Traefik**, or *
 
 ## 📖 Learning Modules
 
+### Core Networking (Modules 0-7)
+
 | # | Module | Description |
 |---|--------|-------------|
 | 0 | [Roadmap Validation](./teaching/00-roadmap-validation.md) | Assessment & learning path |
@@ -30,6 +32,16 @@ Build production-ready cloud networking tools like **Cilium**, **Traefik**, or *
 | 5 | [Go Networking](./teaching/05-go-networking.md) | TCP/UDP, ICMP, health checks |
 | 6 | [eBPF Fundamentals](./teaching/06-ebpf-fundamentals.md) | XDP, TC, maps, verifier |
 | 7 | [Quick Reference](./teaching/07-quick-reference.md) | Commands & code snippets |
+
+### Advanced eBPF (Modules 8-12) 🆕
+
+| # | Module | Description |
+|---|--------|-------------|
+| 8 | [eBPF VM Deep Dive](./teaching/08-ebpf-vm-deep-dive.md) | Registers, instructions, JIT, verifier |
+| 9 | [eBPF Maps Mastery](./teaching/09-ebpf-maps-mastery.md) | All map types, ring buffer, rate limiter |
+| 10 | [CO-RE & BTF](./teaching/10-core-btf-portability.md) | Portable programs, vmlinux.h, BPF_CORE_READ |
+| 11 | [eBPF Networking Guide](./teaching/11-ebpf-networking-guide.md) | Complete packet flow, XDP vs TC, load balancer |
+| 12 | [eBPF Security](./teaching/12-ebpf-security.md) | LSM BPF, seccomp, observability, Tetragon |
 
 ## 🗺️ Complete Roadmap
 
