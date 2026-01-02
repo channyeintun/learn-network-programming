@@ -703,6 +703,9 @@ myproject/
 - https://nakryiko.com/posts/ - Andrii Nakryiko's blog (eBPF maintainer)
 - https://www.brendangregg.com/ebpf.html - Brendan Gregg's eBPF page
 
+### Videos
+- [eBPF - Everything You Need to Know in 5 Minutes](https://www.youtube.com/watch?v=KhPrMW5Rbbc) - Thomas Graf (CTO, Isovalent) KubeCon keynote - Quick intro to eBPF
+
 ### Projects to Study
 - **Cilium** - eBPF-based Kubernetes networking
 - **Katran** - Facebook's L4 load balancer
