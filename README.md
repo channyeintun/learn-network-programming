@@ -33,7 +33,7 @@ Build production-ready cloud networking tools like **Cilium**, **Traefik**, or *
 | 6 | [eBPF Fundamentals](./teaching/06-ebpf-fundamentals.md) | XDP, TC, maps, verifier |
 | 7 | [Quick Reference](./teaching/07-quick-reference.md) | Commands & code snippets |
 
-### Advanced eBPF (Modules 8-12) 🆕
+### Advanced eBPF (Modules 8-13) 🆕
 
 | # | Module | Description |
 |---|--------|-------------|
@@ -42,6 +42,7 @@ Build production-ready cloud networking tools like **Cilium**, **Traefik**, or *
 | 10 | [CO-RE & BTF](./teaching/10-core-btf-portability.md) | Portable programs, vmlinux.h, BPF_CORE_READ |
 | 11 | [eBPF Networking Guide](./teaching/11-ebpf-networking-guide.md) | Complete packet flow, XDP vs TC, load balancer |
 | 12 | [eBPF Security](./teaching/12-ebpf-security.md) | LSM BPF, seccomp, observability, Tetragon |
+| 13 | [Socket Programming](./teaching/13-socket-programming.md) | Socket filters, sockops, sk_msg, SOCKMAP, cgroup BPF |
 
 ## 🗺️ Complete Roadmap
 
